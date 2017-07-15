@@ -7,20 +7,22 @@ import Control.Monad (forever)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (asks)
 import Control.Monad.Trans.Reader (ReaderT(..), runReaderT)
-import Data.List (isPrefixOf)
+import Data.Bifunctor (first)
+import Data.List (isPrefixOf, foldl')
 import Network (connectTo, PortID(..))
 import Text.Printf (printf, hPrintf)
-import System.IO
 import System.Exit (exitSuccess)
+import System.IO
+import Data.Time.Clock (getCurrentTime, diffUTCTime, UTCTime, NominalDiffTime)
 
 -- Data
 
-data Bot = Bot { socket :: Handle }
+data Bot
+  = Bot { socket :: Handle
+        , startTime :: UTCTime
+        }
 
 type Net = ReaderT Bot IO
-
-askSocket :: Net Handle
-askSocket = asks socket
 
 -- Configs
 
@@ -46,9 +48,10 @@ start = bracket connect disconnect loop
 
 connect :: IO Bot
 connect = notify $ do
+  t <- getCurrentTime
   h <- connectTo server $ PortNumber (fromIntegral port)
   hSetBuffering h NoBuffering
-  return $ Bot h
+  return $ Bot h t
   where
     notify = bracket_
       (printf "Connecting to %s ..." server >> hFlush stdout)
@@ -59,11 +62,11 @@ run = do
   write "NICK" nick
   write "USER" $ nick ++ " 0 * :tutorial bot"
   write "JOIN" chan
-  askSocket >>= listen
+  asks socket >>= listen
 
 write :: String -> String -> Net ()
 write s t = do
-  h <- askSocket
+  h <- asks socket
   liftIO $ do
     hPrintf h "%s %s\r\n" s t
     printf "> %s %s\n" s t
@@ -89,9 +92,27 @@ eval :: String -> Net ()
 eval "!quit" = do
   write "QUIT" ":Exiting"
   liftIO exitSuccess
+eval "!uptime" = uptime >>= privmsg
 eval x
   | "!id " `isPrefixOf` x = privmsg $ drop 4 x
 eval _ = return ()
 
 privmsg :: String -> Net ()
 privmsg s = write "PRIVMSG" $ chan ++ " :" ++ s
+
+uptime :: Net String
+uptime = do
+  now <- liftIO getCurrentTime
+  zero <- asks startTime
+  return . pretty $ diffUTCTime now zero
+
+pretty :: NominalDiffTime -> String
+pretty dt =
+  unwords $ fmap (uncurry (++) . first show) $
+  if null diffs then [(0 :: Int, "s")] else diffs
+    where
+      merge (tot, acc) (sec, typ) =
+        let (sec', tot') = divMod tot sec
+        in (tot', (sec', typ) : acc)
+      metrics = [(86400, "d"), (3600, "h"), (60, "m"), (1, "s")]
+      diffs = filter ((/= 0) . fst) $ reverse $ snd $ foldl' merge (floor dt, []) metrics

@@ -13,5 +13,6 @@ Open https://webchat.freenode.net/ and test the commands below!
 
 ## Commands
 
-- `!id <some message>`: make the bot echo your message
+- `!id <some message>`: echo your message
+- `!uptime`: show the bot's uptime
 - `!quit`: quit the bot
