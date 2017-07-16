@@ -16,11 +16,15 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Cru
+  other-modules:       Cru.IRC
+                     , Cru.WebSockets
   build-depends:       base >= 4.7 && < 5
-                     , network
                      , mtl
-                     , transformers
+                     , network
+                     , text
                      , time
+                     , transformers
+                     , websockets
   default-language:    Haskell2010
 
 executable cru-exe
