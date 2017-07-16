@@ -28,6 +28,7 @@ library
                      , transformers
                      , wai
                      , wai-app-static
+                     , wai-websockets
                      , warp
                      , websockets
   default-language:    Haskell2010

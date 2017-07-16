@@ -1,14 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Cru.WebSockets
-  ( start
+  ( app
   ) where
 
 import Data.Text.Lazy (Text)
 import Data.Text.Lazy.Encoding (decodeUtf8)
 import qualified Network.WebSockets as WS
-
-start :: IO ()
-start = WS.runServer "0.0.0.0" 8080 app
 
 app :: WS.ServerApp
 app pc = do
