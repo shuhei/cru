@@ -17,13 +17,18 @@ library
   hs-source-dirs:      src
   exposed-modules:     Cru
   other-modules:       Cru.IRC
+                     , Cru.Web
                      , Cru.WebSockets
   build-depends:       base >= 4.7 && < 5
+                     , aeson
                      , mtl
                      , network
                      , text
                      , time
                      , transformers
+                     , wai
+                     , wai-app-static
+                     , warp
                      , websockets
   default-language:    Haskell2010
 
