@@ -8,5 +8,5 @@ import qualified Network.Wai.Application.Static as S
 
 app :: W.Application
 app =
-  let settings = S.defaultWebAppSettings "public"
+  let settings = S.defaultWebAppSettings "front/build"
   in S.staticApp settings
