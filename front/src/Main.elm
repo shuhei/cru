@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Html exposing (Html, text, div, img)
 import Html.Attributes exposing (src)
+import WebSocket as WS
 
 
 ---- MODEL ----
@@ -22,11 +23,17 @@ init =
 
 type Msg
     = NoOp
+    | SocketMessage String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case Debug.log "msg" msg of
+        NoOp ->
+            ( model, Cmd.none )
+
+        SocketMessage message ->
+            ( model, Cmd.none )
 
 
 
@@ -36,10 +43,20 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ img [ src "/logo.svg" ] []
-        , div [] [ text "Your Elm App is working!" ]
+        [ div [] [ text "Your Elm App is working!" ]
         ]
 
+
+---- SUBSCRIPTION ----
+
+
+wsEndpoint : String
+wsEndpoint = "ws://localhost:8080"
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    WS.listen wsEndpoint SocketMessage
 
 
 ---- PROGRAM ----
@@ -51,5 +68,5 @@ main =
         { view = view
         , init = init
         , update = update
-        , subscriptions = always Sub.none
+        , subscriptions = subscriptions
         }
