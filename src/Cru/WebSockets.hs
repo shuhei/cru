@@ -8,24 +8,20 @@ import Data.Text.Lazy (Text)
 import Data.Text.Lazy.Encoding (decodeUtf8)
 import qualified Network.WebSockets as WS
 
-data Message
-  = Connected
-  | LogIn String String
-  | LoggedIn
-  | SendMessage String
-  | MessageReceived String
-  | LogOut
-  | LoggedOut
-
-
-
 app :: WS.ServerApp
 app pc = do
   conn <- WS.acceptRequest pc
-  WS.sendTextData conn ("fooo" :: ByteString)
-  m <- extractMessage <$> WS.receiveDataMessage conn
-  print m
+  WS.sendTextData conn ("connected" :: ByteString)
+  (nickname, channel) <- waitLogin conn
+  print (nickname, channel)
   return ()
+
+waitLogin :: WS.Connection -> IO (String, String)
+waitLogin conn = do
+  m <- extractMessage <$> WS.receiveDataMessage conn
+  if m == "login"
+  then return ("tutbot", "#tutbot-testing")
+  else waitLogin conn
 
 -- TODO: Write message decoder
 extractMessage :: WS.DataMessage -> Text
