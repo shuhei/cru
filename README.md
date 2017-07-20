@@ -1,18 +1,27 @@
 # cru
 
-WIP IRC client based on [Roll your own IRC bot](https://wiki.haskell.org/Roll_your_own_IRC_bot)
+WIP IRC client with Haskell and Elm
 
 ## Run
+
+Server:
 
 ```sh
 stack build
 stack exec -- cru-exe
 ```
 
-Open https://webchat.freenode.net/ and test the commands below!
+Client:
 
-## Commands
+```
+npm install -g create-elm-app
 
-- `!id <some message>`: echo your message
-- `!uptime`: show the bot's uptime
-- `!quit`: quit the bot
+cd front
+elm-app start
+
+open http://localhost:3000
+```
+
+## Test
+
+Open https://webchat.freenode.net/ and test!
