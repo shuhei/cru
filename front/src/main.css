@@ -1,6 +1,4 @@
-body {
-  font-family: 'Source Sans Pro', 'Lucida Grande', 'Helvetica Neue', sans-serif;
-  font-size: 16px;
-  margin: 0;
-  color: #293c4b;
+.login-form {
+  max-width: 500px;
+  margin: 100px auto;
 }

@@ -1,7 +1,7 @@
 module Main exposing (..)
 
-import Html exposing (Html, text, div, input, p, button)
-import Html.Attributes exposing (value)
+import Html exposing (Html, Attribute, text, div, span, input, p, button, i, label)
+import Html.Attributes exposing (value, class, type_, placeholder)
 import Html.Events exposing (onInput, onClick)
 import WebSocket as WS
 
@@ -67,14 +67,20 @@ update msg model =
 handleMessage : String -> Model -> ( Model, Cmd Msg )
 handleMessage message model =
     case message of
-        "connected" -> ( { model | connected = True }, Cmd.none )
-        "loggedin" -> ( { model | loggedIn = True }, Cmd.none )
-        _ -> ( { model | lines = message :: model.lines }, Cmd.none )
+        "connected" ->
+            ( { model | connected = True }, Cmd.none )
+
+        "loggedin" ->
+            ( { model | loggedIn = True }, Cmd.none )
+
+        _ ->
+            ( { model | lines = message :: model.lines }, Cmd.none )
 
 
 sendMessage : String -> Cmd msg
 sendMessage =
     WS.send wsEndpoint
+
 
 
 ---- VIEW ----
@@ -94,36 +100,48 @@ viewLines : List String -> Html Msg
 viewLines lines =
     let
         viewLine line =
-            p [] [text line]
+            p [] [ text line ]
     in
         div [] <| List.map viewLine (List.reverse lines)
 
 
+inputField : String -> List (Attribute msg) -> Html msg
+inputField name attrs =
+    div [ class "field" ]
+        [ label [ class "label" ] [ text name ]
+        , div
+            [ class "control" ]
+            [ input ([ class "input", type_ "text" ] ++ attrs) []
+            ]
+        ]
+
+
 viewLoginForm : Model -> Html Msg
 viewLoginForm model =
-    div []
-        [ input
-            [ value <| model.nickname, onInput ChangeNickname ]
-            []
-        , input
-            [ value <| model.channel, onInput ChangeChannel ]
-            []
-        , button
-            [ onClick LogIn ]
-            [ text "Log in" ]
+    div [ class "box login-form" ]
+        [ inputField "Nickname" [ value <| model.nickname, onInput ChangeNickname ]
+        , inputField "Channel"[ value <| model.channel, onInput ChangeChannel ]
+        , div
+            [ class "control" ]
+            [ button [ class "button is-primary", onClick LogIn ]
+                [ text "Log in" ]
+            ]
         ]
+
 
 
 ---- SUBSCRIPTION ----
 
 
 wsEndpoint : String
-wsEndpoint = "ws://localhost:8080"
+wsEndpoint =
+    "ws://localhost:8080"
 
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     WS.listen wsEndpoint IncomingMessage
+
 
 
 ---- PROGRAM ----
