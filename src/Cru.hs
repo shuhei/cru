@@ -1,17 +1,13 @@
 module Cru where
 
-import qualified Cru.IRC as IRC
 import qualified Cru.Web as Web
 import qualified Cru.WebSockets as WS
-import Control.Concurrent (forkIO)
 import qualified Network.Wai.Handler.WebSockets as HWS
 import qualified Network.Wai.Handler.Warp as HW
 import qualified Network.WebSockets.Connection as WSC
 
 start :: IO ()
-start = do
-  forkIO $ startWeb 8080
-  IRC.start
+start = startWeb 8080
 
 startWeb :: Int -> IO ()
 startWeb port = do

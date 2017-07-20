@@ -24,6 +24,7 @@ library
                      , bytestring
                      , mtl
                      , network
+                     , stm
                      , text
                      , time
                      , transformers

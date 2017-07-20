@@ -68,7 +68,8 @@ handleMessage : String -> Model -> ( Model, Cmd Msg )
 handleMessage message model =
     case message of
         "connected" -> ( { model | connected = True }, Cmd.none )
-        _ -> ( model, Cmd.none )
+        "loggedin" -> ( { model | loggedIn = True }, Cmd.none )
+        _ -> ( { model | lines = message :: model.lines }, Cmd.none )
 
 
 sendMessage : String -> Cmd msg
@@ -84,13 +85,22 @@ view model =
     if not model.connected then
         p [] [ text "Connecting..." ]
     else if not model.loggedIn then
-        loginForm model
+        viewLoginForm model
     else
-        p [] [ text "Logged in!" ]
+        viewLines model.lines
 
 
-loginForm : Model -> Html Msg
-loginForm model =
+viewLines : List String -> Html Msg
+viewLines lines =
+    let
+        viewLine line =
+            p [] [text line]
+    in
+        div [] <| List.map viewLine (List.reverse lines)
+
+
+viewLoginForm : Model -> Html Msg
+viewLoginForm model =
     div []
         [ input
             [ value <| model.nickname, onInput ChangeNickname ]
