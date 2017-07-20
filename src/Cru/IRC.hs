@@ -1,8 +1,8 @@
 module Cru.IRC
     ( connect
-    , run
+    , reader
+    , writer
     , runIRC
-    , runForward
     , Config(..)
     ) where
 
@@ -16,9 +16,10 @@ import Control.Monad.Trans.Reader (ReaderT(..), runReaderT)
 import Data.List (isPrefixOf)
 import Network (connectTo, PortID(..))
 import Text.Printf (printf, hPrintf)
-import System.IO
+import System.IO (Handle, hSetBuffering, hGetLine, BufferMode(..), hFlush, hClose, stdout)
+import Cru.Types
 
--- Data
+-- Types
 
 data Config =
   Config { _socket :: Handle
@@ -28,6 +29,9 @@ data Config =
          }
 
 type Net = ReaderT Config IO
+
+runIRC :: Net a -> Config -> IO a
+runIRC = runReaderT
 
 -- Configs
 
@@ -49,17 +53,14 @@ connect = notify $ do
       (printf "Connecting to %s ..." server >> hFlush stdout)
       (putStrLn "done.")
 
-run :: Net ()
-run = do
+reader :: Net ()
+reader = do
   Config h nick chan outgoing <- ask
   write "NICK" nick
   write "USER" $ nick ++ " 0 * :tutorial bot"
   write "JOIN" chan
   liftIO . STM.atomically $ TC.writeTChan outgoing "loggedin"
   listen h
-
-runIRC :: Net a -> Config -> IO a
-runIRC = runReaderT
 
 write :: String -> String -> Net ()
 write s t = do
@@ -85,12 +86,28 @@ listen h = forever $ do
     -- :shuhei!051c50d7@gateway/web/freenode/ip.5.28.80.215 PRIVMSG #tutbot-testing :hey
     clean = drop 1 . dropWhile (/= ':') . drop 1
 
-runForward :: TC.TChan String -> Net ()
-runForward incoming = forever $ do
-  s <- liftIO . STM.atomically $ TC.readTChan incoming
-  privmsg s
+-- Receive WebSockets messages and forward them to IRC or close IRC connection.
+writer :: TC.TChan WSMessage -> Net ()
+writer incoming = do
+  m <- liftIO . STM.atomically $ TC.readTChan incoming
+  case m of
+    WSTextMessage s -> do
+      privmsg s
+      writer incoming
+    WSConnectionClose -> do
+      h <- asks _socket
+      part
+      liftIO $ do
+        putStrLn "Disconnecting IRC"
+        hClose h
+        putStrLn "Disconnected IRC"
 
 privmsg :: String -> Net ()
 privmsg s = do
   chan <- asks _channel
   write "PRIVMSG" $ chan ++ " :" ++ s
+
+part :: Net ()
+part = do
+  chan <- asks _channel
+  write "PART" chan
