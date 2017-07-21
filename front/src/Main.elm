@@ -1,8 +1,10 @@
 module Main exposing (..)
 
+import String
 import Html exposing (Html, Attribute, text, div, span, input, p, button, i, label)
 import Html.Attributes exposing (value, class, type_, placeholder)
-import Html.Events exposing (onInput, onClick)
+import Html.Events as E
+import Json.Decode as Json
 import WebSocket as WS
 
 
@@ -10,21 +12,23 @@ import WebSocket as WS
 
 
 type alias Model =
-    { connected : Bool
+    { wsConnected : Bool
     , loggedIn : Bool
     , nickname : String
     , channel : String
     , lines : List String
+    , chatMessage : String
     }
 
 
 initialModel : Model
 initialModel =
-    { connected = False
+    { wsConnected = False
     , loggedIn = False
     , nickname = "test"
     , channel = "#tutbot-testing"
     , lines = []
+    , chatMessage = ""
     }
 
 
@@ -42,6 +46,8 @@ type Msg
     | IncomingMessage String
     | ChangeNickname String
     | ChangeChannel String
+    | ChangeChatMessage String
+    | SendChatMessage
     | LogIn
 
 
@@ -60,6 +66,15 @@ update msg model =
         ChangeChannel channel ->
             ( { model | channel = channel }, Cmd.none )
 
+        ChangeChatMessage message ->
+            ( { model | chatMessage = message }, Cmd.none )
+
+        SendChatMessage ->
+            if String.isEmpty model.chatMessage then
+                ( model, Cmd.none )
+            else
+                ( { model | chatMessage = "" }, sendMessage model.chatMessage )
+
         LogIn ->
             ( model, sendMessage "login" )
 
@@ -68,7 +83,7 @@ handleMessage : String -> Model -> ( Model, Cmd Msg )
 handleMessage message model =
     case message of
         "connected" ->
-            ( { model | connected = True }, Cmd.none )
+            ( { model | wsConnected = True }, Cmd.none )
 
         "loggedin" ->
             ( { model | loggedIn = True }, Cmd.none )
@@ -88,12 +103,35 @@ sendMessage =
 
 view : Model -> Html Msg
 view model =
-    if not model.connected then
+    if not model.wsConnected then
         p [] [ text "Connecting..." ]
     else if not model.loggedIn then
         viewLoginForm model
     else
-        viewLines model.lines
+        div [ class "chat-container" ]
+            [ viewLines model.lines
+            , chatBox model.chatMessage
+            ]
+
+
+chatBox : String -> Html Msg
+chatBox message =
+    div [ class "chat-box" ]
+        [ div
+            [ class "field" ]
+            [ div
+                [ class "control" ]
+                [ input
+                    [ class "input"
+                    , type_ "text"
+                    , value message
+                    , E.onInput ChangeChatMessage
+                    , onEnter SendChatMessage
+                    ]
+                    []
+                ]
+            ]
+        ]
 
 
 viewLines : List String -> Html Msg
@@ -102,7 +140,8 @@ viewLines lines =
         viewLine line =
             p [] [ text line ]
     in
-        div [] <| List.map viewLine (List.reverse lines)
+        div [ class "chat-lines" ] <|
+            List.map viewLine (List.reverse lines)
 
 
 inputField : String -> List (Attribute msg) -> Html msg
@@ -119,15 +158,26 @@ inputField name attrs =
 viewLoginForm : Model -> Html Msg
 viewLoginForm model =
     div [ class "box login-form" ]
-        [ inputField "Nickname" [ value <| model.nickname, onInput ChangeNickname ]
-        , inputField "Channel"[ value <| model.channel, onInput ChangeChannel ]
+        [ inputField "Nickname" [ value <| model.nickname, E.onInput ChangeNickname ]
+        , inputField "Channel"[ value <| model.channel, E.onInput ChangeChannel ]
         , div
             [ class "control" ]
-            [ button [ class "button is-primary", onClick LogIn ]
+            [ button [ class "button is-primary", E.onClick LogIn ]
                 [ text "Log in" ]
             ]
         ]
 
+
+onEnter : msg -> Attribute msg
+onEnter tagger =
+    let
+        isEnter keyCode =
+            if keyCode == 13 then
+                Json.succeed tagger
+            else
+                Json.fail <| toString keyCode
+    in
+        E.on "keyup" <| Json.andThen isEnter E.keyCode
 
 
 ---- SUBSCRIPTION ----
