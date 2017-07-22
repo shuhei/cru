@@ -3,14 +3,14 @@ module Cru.WebSockets
   ( app
   ) where
 
-import qualified Control.Concurrent as CC
-import qualified Control.Concurrent.STM.TChan as TC
+import Control.Concurrent.Async (race)
+import Control.Concurrent.STM.TChan (TChan, newTChan, readTChan, writeTChan)
 import Control.Exception (try)
 import Control.Monad (forever)
-import qualified Control.Monad.STM as STM
+import Control.Monad.STM (atomically)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as BSC
-import qualified Data.Text.Lazy as LT
+import qualified Data.Text.Lazy as TL
 import Data.Text.Lazy.Encoding (decodeUtf8)
 import qualified Network.WebSockets as WS
 import qualified Cru.IRC as IRC
@@ -26,18 +26,19 @@ app pc = do
   print (nickname, channel)
 
   handle <- IRC.connect
-  (chanIRC, chanWS) <- STM.atomically $ (,) <$> TC.newTChan <*> TC.newTChan
-  -- TODO: Stop threads somehow. Kill from outside or stop inside with a TVar?
+  (chanIRC, chanWS) <- atomically $ (,) <$> newTChan <*> newTChan
   let config = IRC.Config handle nickname channel chanIRC
-  CC.forkIO $ IRC.runIRC IRC.reader config
-  CC.forkIO $ IRC.runIRC (IRC.writer chanWS) config
 
-  CC.forkIO $ writer chanIRC conn
-  reader chanWS conn
+  let irc = race (IRC.runIRC IRC.reader config)
+                 (IRC.runIRC (IRC.writer chanWS) config)
+  let ws = race (writer chanIRC conn)
+                (reader chanWS conn)
+  race ws irc
+  return ()
 
-writer :: TC.TChan String -> WS.Connection -> IO ()
+writer :: TChan String -> WS.Connection -> IO ()
 writer incoming conn = forever $ do
-  s <- STM.atomically $ TC.readTChan incoming
+  s <- atomically $ readTChan incoming
   WS.sendTextData conn $ BSC.pack s
 
 waitLogin :: WS.Connection -> IO (String, String)
@@ -47,7 +48,7 @@ waitLogin conn = do
   then return ("tutbot", "#tutbot-testing")
   else waitLogin conn
 
-reader :: TC.TChan WSMessage -> WS.Connection -> IO ()
+reader :: TChan WSMessage -> WS.Connection -> IO ()
 reader outgoing conn = do
   lr <- try $ WSTextMessage . extractMessage <$> WS.receiveDataMessage conn
   case lr of
@@ -60,9 +61,9 @@ reader outgoing conn = do
   where
     forward m = do
       print m
-      STM.atomically $ TC.writeTChan outgoing m
+      atomically $ writeTChan outgoing m
 
 -- TODO: Write message decoder
 extractMessage :: WS.DataMessage -> String
-extractMessage (WS.Text txt) = LT.unpack $ decodeUtf8 txt
+extractMessage (WS.Text txt) = TL.unpack $ decodeUtf8 txt
 extractMessage (WS.Binary _) = "binary!"
