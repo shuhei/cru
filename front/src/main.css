@@ -23,10 +23,17 @@ body {
   justify-content: space-between;
 }
 
+.chat-header {
+  color: #000;
+  font-weight: bold;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ccc;
+}
+
 .chat-lines {
   flex: 1;
   overflow-y: scroll;
-  margin-bottom: 20px;
+  padding: 16px 0;
 }
 
 .chat-lines::-webkit-scrollbar {
@@ -34,22 +41,21 @@ body {
 }
 
 .chat-lines::-webkit-scrollbar:vertical {
-    width: 11px;
+    width: 8px;
 }
 
 .chat-lines::-webkit-scrollbar:horizontal {
-    height: 11px;
+    height: 8px;
 }
 
 .chat-lines::-webkit-scrollbar-thumb {
-    border-radius: 8px;
-    border: 2px solid white; /* should match background, can't be transparent */
-    background-color: rgba(0, 0, 0, .5);
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, .2);
 }
 
 .chat-lines::-webkit-scrollbar-track {
-    background-color: #fff;
-    border-radius: 8px;
+    background-color: #eee;
+    border-radius: 4px;
 }
 
 .chat-box {

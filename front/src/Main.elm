@@ -91,7 +91,7 @@ handleMessage message model =
             ( { model | loggedIn = True }, Cmd.none )
 
         _ ->
-            ( { model | lines = message :: model.lines } , scrollToBottom )
+            ( { model | lines = message :: model.lines }, scrollToBottom )
 
 
 sendMessage : String -> Cmd msg
@@ -102,6 +102,7 @@ sendMessage =
 scrollToBottom : Cmd Msg
 scrollToBottom =
     Task.attempt (always NoOp) <| Scroll.toBottom linesContainerId
+
 
 
 ---- VIEW ----
@@ -115,9 +116,16 @@ view model =
         viewLoginForm model
     else
         div [ class "chat-container" ]
-            [ viewLines model.lines
+            [ chatHeader model.nickname model.channel
+            , viewLines model.lines
             , chatBox model.chatMessage
             ]
+
+
+chatHeader : String -> String -> Html msg
+chatHeader nickname channel =
+    div [ class "chat-header" ]
+        [ text <| nickname ++ " " ++ channel ]
 
 
 chatBox : String -> Html Msg
@@ -141,7 +149,8 @@ chatBox message =
 
 
 linesContainerId : String
-linesContainerId = "chat-lines"
+linesContainerId =
+    "chat-lines"
 
 
 viewLines : List String -> Html Msg
@@ -169,7 +178,7 @@ viewLoginForm : Model -> Html Msg
 viewLoginForm model =
     div [ class "box login-form" ]
         [ inputField "Nickname" [ value <| model.nickname, E.onInput ChangeNickname ]
-        , inputField "Channel"[ value <| model.channel, E.onInput ChangeChannel ]
+        , inputField "Channel" [ value <| model.channel, E.onInput ChangeChannel ]
         , div
             [ class "control" ]
             [ button [ class "button is-primary", E.onClick LogIn ]
@@ -188,6 +197,7 @@ onEnter tagger =
                 Json.fail <| toString keyCode
     in
         E.on "keyup" <| Json.andThen isEnter E.keyCode
+
 
 
 ---- SUBSCRIPTION ----
