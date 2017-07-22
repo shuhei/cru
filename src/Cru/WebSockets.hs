@@ -5,7 +5,7 @@ module Cru.WebSockets
 
 import Control.Concurrent.Async (race)
 import Control.Concurrent.STM.TChan (TChan, newTChan, readTChan, writeTChan)
-import Control.Exception (try)
+import Control.Exception (try, finally)
 import Control.Monad (forever)
 import Control.Monad.STM (atomically)
 import Data.ByteString.Lazy (ByteString)
@@ -13,6 +13,7 @@ import qualified Data.ByteString.Lazy.Char8 as BSC
 import qualified Data.Text.Lazy as TL
 import Data.Text.Lazy.Encoding (decodeUtf8)
 import qualified Network.WebSockets as WS
+import System.IO (hClose)
 import qualified Cru.IRC as IRC
 import Cru.Types
 
@@ -20,10 +21,11 @@ import Cru.Types
 
 app :: WS.ServerApp
 app pc = do
+  -- WS connection is closed by websockets library.
   conn <- WS.acceptRequest pc
   WS.sendTextData conn ("connected" :: ByteString)
   (nickname, channel) <- waitLogin conn
-  print (nickname, channel)
+  putStrLn $ "Login request for " ++ show (nickname, channel)
 
   handle <- IRC.connect
   (chanIRC, chanWS) <- atomically $ (,) <$> newTChan <*> newTChan
@@ -33,7 +35,7 @@ app pc = do
                  (IRC.runIRC (IRC.writer chanWS) config)
   let ws = race (writer chanIRC conn)
                 (reader chanWS conn)
-  race ws irc
+  race ws irc `finally` hClose handle
   return ()
 
 writer :: TChan String -> WS.Connection -> IO ()
@@ -55,7 +57,6 @@ reader outgoing conn = do
     Right tm -> do
       forward tm
       reader outgoing conn
-    -- TODO: Actually close WS connection! Closed by the library?
     Left (WS.CloseRequest _ _) -> forward WSConnectionClose
     Left _ -> forward WSConnectionClose
   where
