@@ -78,7 +78,11 @@ update msg model =
                 ( { model | chatMessage = "" }, sendMessage model.chatMessage )
 
         LogIn ->
-            ( model, sendMessage "login" )
+            let
+                message =
+                    "login " ++ model.nickname ++ " " ++ model.channel
+            in
+                ( model, sendMessage message )
 
 
 handleMessage : String -> Model -> ( Model, Cmd Msg )

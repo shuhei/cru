@@ -46,9 +46,10 @@ writer incoming conn = forever $ do
 waitLogin :: WS.Connection -> IO (String, String)
 waitLogin conn = do
   m <- extractMessage <$> WS.receiveDataMessage conn
-  if m == "login"
-  then return ("tutbot", "#tutbot-testing")
-  else waitLogin conn
+  case words m of
+    "login" : nickname : rest ->
+      return (nickname, unwords rest)
+    _ -> waitLogin conn
 
 reader :: TChan WSMessage -> WS.Connection -> IO ()
 reader outgoing conn = do
