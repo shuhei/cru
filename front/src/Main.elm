@@ -1,10 +1,12 @@
 module Main exposing (..)
 
-import String
-import Html exposing (Html, Attribute, text, div, span, input, p, button, i, label)
-import Html.Attributes exposing (value, class, type_, placeholder)
-import Html.Events as E
+import Dom.Scroll as Scroll
 import Json.Decode as Json
+import Html exposing (Html, Attribute, text, div, span, input, p, button, i, label)
+import Html.Attributes exposing (value, class, id, type_, placeholder)
+import Html.Events as E
+import String
+import Task
 import WebSocket as WS
 
 
@@ -89,13 +91,17 @@ handleMessage message model =
             ( { model | loggedIn = True }, Cmd.none )
 
         _ ->
-            ( { model | lines = message :: model.lines }, Cmd.none )
+            ( { model | lines = message :: model.lines } , scrollToBottom )
 
 
 sendMessage : String -> Cmd msg
 sendMessage =
     WS.send wsEndpoint
 
+
+scrollToBottom : Cmd Msg
+scrollToBottom =
+    Task.attempt (always NoOp) <| Scroll.toBottom linesContainerId
 
 
 ---- VIEW ----
@@ -134,13 +140,17 @@ chatBox message =
         ]
 
 
+linesContainerId : String
+linesContainerId = "chat-lines"
+
+
 viewLines : List String -> Html Msg
 viewLines lines =
     let
         viewLine line =
             p [] [ text line ]
     in
-        div [ class "chat-lines" ] <|
+        div [ class "chat-lines", id linesContainerId ] <|
             List.map viewLine (List.reverse lines)
 
 
