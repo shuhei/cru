@@ -9,7 +9,7 @@ import Control.Exception (try, finally)
 import Control.Monad (forever)
 import Control.Monad.STM (atomically)
 import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy.Char8 as BSC
+import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Lazy.Encoding (decodeUtf8)
 import qualified Network.WebSockets as WS
@@ -29,7 +29,7 @@ app pc = do
 
   handle <- IRC.connect
   (chanIRC, chanWS) <- atomically $ (,) <$> newTChan <*> newTChan
-  let config = IRC.Config handle nickname channel chanIRC
+  let config = IRC.makeConfig handle nickname channel chanIRC
 
   let irc = race (IRC.runIRC IRC.reader config)
                  (IRC.runIRC (IRC.writer chanWS) config)
@@ -38,10 +38,10 @@ app pc = do
   race ws irc `finally` hClose handle
   return ()
 
-writer :: TChan String -> WS.Connection -> IO ()
+writer :: TChan T.Text -> WS.Connection -> IO ()
 writer incoming conn = forever $ do
   s <- atomically $ readTChan incoming
-  WS.sendTextData conn $ BSC.pack s
+  WS.sendTextData conn s
 
 waitLogin :: WS.Connection -> IO (String, String)
 waitLogin conn = do

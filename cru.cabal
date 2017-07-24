@@ -24,6 +24,8 @@ library
                      , aeson
                      , async
                      , bytestring
+                     , irc-fun-messages
+                     , irc-fun-types
                      , mtl
                      , network
                      , stm

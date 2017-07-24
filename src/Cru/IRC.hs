@@ -1,9 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Cru.IRC
     ( connect
     , reader
     , writer
     , runIRC
-    , Config(..)
+    , Config
+    , makeConfig
     ) where
 
 import qualified Control.Concurrent.STM.TChan as TC
@@ -14,19 +16,27 @@ import Control.Monad.Reader (ask, asks)
 import qualified Control.Monad.STM as STM
 import Control.Monad.Trans.Reader (ReaderT(..), runReaderT)
 import Data.List (isPrefixOf)
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Network (connectTo, PortID(..))
-import Text.Printf (printf, hPrintf)
-import System.IO (Handle, hSetBuffering, hGetLine, BufferMode(..), hFlush, hClose, stdout)
+import Network.Irc.Messages as IRCM
+import Network.Irc.Types hiding (PortNumber)
+import Text.Printf (printf)
+import System.IO
 import Cru.Types
 
 -- Types
 
 data Config =
   Config { _socket :: Handle
-         , _nickname :: String
-         , _channel :: String
-         , _out :: TC.TChan String
+         , _nickname :: Nickname
+         , _channel :: Channel
+         , _out :: TC.TChan T.Text
          }
+
+makeConfig :: Handle -> String -> String -> TC.TChan T.Text -> Config
+makeConfig h nick channel =
+  Config h (Nickname $ T.pack nick) (Channel $ T.pack channel)
 
 type Net = ReaderT Config IO
 
@@ -55,19 +65,23 @@ connect = notify $ do
 
 reader :: Net ()
 reader = do
-  Config h nick chan outgoing <- ask
-  write "NICK" nick
-  write "USER" $ nick ++ " 0 * :tutorial bot"
-  write "JOIN" chan
+  Config h nick@(Nickname name) chan outgoing <- ask
+  write $ NickMessage nick
+  write $ UserMessage (Username name) False False (RealName "tutorial bot")
+  write $ JoinMessage (Just ([chan], []))
   liftIO . STM.atomically $ TC.writeTChan outgoing "loggedin"
   listen h
 
-write :: String -> String -> Net ()
-write s t = do
+write :: Message -> Net ()
+write sm = do
   h <- asks _socket
+  let m = serialize sm
   liftIO $ do
-    hPrintf h "%s %s\r\n" s t
-    printf "> %s %s\n" s t
+    TIO.hPutStr h m
+    TIO.putStr $ T.concat ["> ", m]
+ where
+  serialize =
+    IRCM.serializeMessage . IRCM.buildMessage . SpecificMessage Nothing
 
 listen :: Handle -> Net ()
 listen h = forever $ do
@@ -76,10 +90,10 @@ listen h = forever $ do
   liftIO $ putStrLn s
   if ping s
   then pong s
-  else forward out $ clean s
+  else forward out . T.pack $ clean s
   where
     ping x = "PING :" `isPrefixOf` x
-    pong x = write "PONG" (':' : drop 6 x)
+    pong x = write $ PongMessage (Hostname (T.pack $ ':' : drop 6 x)) Nothing
     forward o s = liftIO . STM.atomically $ TC.writeTChan o s
     -- Clean prefix and get the actual messge from a line.
     -- This will get "hey" from the following example line:
@@ -105,9 +119,9 @@ writer incoming = do
 privmsg :: String -> Net ()
 privmsg s = do
   chan <- asks _channel
-  write "PRIVMSG" $ chan ++ " :" ++ s
+  write $ PrivMsgMessage (ChannelTarget chan) (MsgContent $ T.pack s)
 
 part :: Net ()
 part = do
   chan <- asks _channel
-  write "PART" chan
+  write $ PartMessage [chan] Nothing
