@@ -15,7 +15,6 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (ask, asks)
 import qualified Control.Monad.STM as STM
 import Control.Monad.Trans.Reader (ReaderT(..), runReaderT)
-import Data.List (isPrefixOf)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Network (connectTo, PortID(..))
@@ -31,10 +30,10 @@ data Config =
   Config { _socket :: Handle
          , _nickname :: Nickname
          , _channel :: Channel
-         , _out :: TC.TChan T.Text
+         , _out :: TC.TChan (Either SpecificReply SpecificMessage)
          }
 
-makeConfig :: Handle -> String -> String -> TC.TChan T.Text -> Config
+makeConfig :: Handle -> String -> String -> TC.TChan (Either SpecificReply SpecificMessage) -> Config
 makeConfig h nick channel =
   Config h (Nickname $ T.pack nick) (Channel $ T.pack channel)
 
@@ -65,11 +64,10 @@ connect = notify $ do
 
 reader :: Net ()
 reader = do
-  Config h nick@(Nickname name) chan outgoing <- ask
+  Config h nick@(Nickname name) chan _outgoing <- ask
   write $ NickMessage nick
   write $ UserMessage (Username name) False False (RealName "tutorial bot")
   write $ JoinMessage (Just ([chan], []))
-  liftIO . STM.atomically $ TC.writeTChan outgoing "loggedin"
   listen h
 
 write :: Message -> Net ()
@@ -86,19 +84,23 @@ write sm = do
 listen :: Handle -> Net ()
 listen h = forever $ do
   out <- asks _out
-  s <- liftIO $ init <$> hGetLine h
-  liftIO $ putStrLn s
-  if ping s
-  then pong s
-  else forward out . T.pack $ clean s
+  -- Remove the trailing \r
+  line <- liftIO $ T.init <$> TIO.hGetLine h
+  let parsed = IRCM.analyze <$> IRCM.parseMessage line
+  liftIO $ do
+    print line
+    print parsed
+  case parsed of
+    Just (Right (Right (SpecificMessage _prefix (PingMessage server1 server2)))) ->
+      write $ PongMessage server1 server2
+    Just (Right msg) ->
+      forward out msg
+    Just (Left err) ->
+      liftIO $ TIO.putStrLn $ T.concat ["Parse error: ", err]
+    Nothing ->
+      return ()
   where
-    ping x = "PING :" `isPrefixOf` x
-    pong x = write $ PongMessage (Hostname (T.pack $ ':' : drop 6 x)) Nothing
-    forward o s = liftIO . STM.atomically $ TC.writeTChan o s
-    -- Clean prefix and get the actual messge from a line.
-    -- This will get "hey" from the following example line:
-    -- :shuhei!051c50d7@gateway/web/freenode/ip.5.28.80.215 PRIVMSG #tutbot-testing :hey
-    clean = drop 1 . dropWhile (/= ':') . drop 1
+    forward o = liftIO . STM.atomically . TC.writeTChan o
 
 -- Receive WebSockets messages and forward them to IRC or close IRC connection.
 writer :: TC.TChan WSMessage -> Net ()

@@ -8,6 +8,7 @@ import Html.Events as E
 import String
 import Task
 import WebSocket as WS
+import Cru.Types exposing (..)
 
 
 ---- MODEL ----
@@ -45,7 +46,10 @@ init =
 
 type Msg
     = NoOp
-    | IncomingMessage String
+    | IncomingMessage SpecificMessage
+    | IncomingReply SpecificReply
+    | Connected
+    | DecodeFailed String
     | ChangeNickname String
     | ChangeChannel String
     | ChangeChatMessage String
@@ -59,8 +63,17 @@ update msg model =
         NoOp ->
             ( model, Cmd.none )
 
+        Connected ->
+            ( { model | wsConnected = True }, Cmd.none )
+
         IncomingMessage message ->
             handleMessage message model
+
+        IncomingReply reply ->
+            handleReply reply model
+
+        DecodeFailed e ->
+            ( model, Cmd.none )
 
         ChangeNickname nickname ->
             ( { model | nickname = nickname }, Cmd.none )
@@ -85,17 +98,21 @@ update msg model =
                 ( model, sendMessage message )
 
 
-handleMessage : String -> Model -> ( Model, Cmd Msg )
-handleMessage message model =
+handleMessage : SpecificMessage -> Model -> ( Model, Cmd Msg )
+handleMessage { prefix, message } model =
     case message of
-        "connected" ->
-            ( { model | wsConnected = True }, Cmd.none )
+        _ ->
+            ( { model | lines = model.lines }, scrollToBottom )
 
-        "loggedin" ->
+
+handleReply : SpecificReply -> Model -> ( Model, Cmd Msg )
+handleReply { hostname, target, reply } model =
+    case reply of
+        WelcomeReply ->
             ( { model | loggedIn = True }, Cmd.none )
 
         _ ->
-            ( { model | lines = message :: model.lines }, scrollToBottom )
+            ( model, Cmd.none )
 
 
 sendMessage : String -> Cmd msg
@@ -214,7 +231,22 @@ wsEndpoint =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    WS.listen wsEndpoint IncomingMessage
+    let
+        tagger s =
+            if s == "connected" then
+                Connected
+            else
+                case Json.decodeString decodeMessageOrReply s of
+                    Ok (Left r) ->
+                        IncomingReply r
+
+                    Ok (Right m) ->
+                        IncomingMessage m
+
+                    Err e ->
+                        DecodeFailed e
+    in
+        WS.listen wsEndpoint tagger
 
 
 

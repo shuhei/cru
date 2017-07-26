@@ -8,11 +8,12 @@ import Control.Concurrent.STM.TChan (TChan, newTChan, readTChan, writeTChan)
 import Control.Exception (try, finally)
 import Control.Monad (forever)
 import Control.Monad.STM (atomically)
+import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
-import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Lazy.Encoding (decodeUtf8)
 import qualified Network.WebSockets as WS
+import Network.Irc.Types
 import System.IO (hClose)
 import qualified Cru.IRC as IRC
 import Cru.Types
@@ -38,10 +39,10 @@ app pc = do
   race ws irc `finally` hClose handle
   return ()
 
-writer :: TChan T.Text -> WS.Connection -> IO ()
+writer :: TChan (Either SpecificReply SpecificMessage) -> WS.Connection -> IO ()
 writer incoming conn = forever $ do
-  s <- atomically $ readTChan incoming
-  WS.sendTextData conn s
+  m <- atomically $ readTChan incoming
+  WS.sendTextData conn $ Aeson.encode m
 
 waitLogin :: WS.Connection -> IO (String, String)
 waitLogin conn = do
